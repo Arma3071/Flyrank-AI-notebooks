@@ -1,0 +1,839 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>The Position Curve Breaks at the Top — CTR Opportunity Scoring</title>
+<meta name="description" content="A CTR/engagement opportunity-scoring study on the FlyRank search-intelligence warehouse: a learned model vs. a hand-written position-based rule.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;1,6..72,400;1,6..72,500&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+
+<style>
+  /* ============================================================
+     Results are populated from the executed capstone notebook
+     (window ending 2026-06-30) and the repo at
+     github.com/Arma3071/Flyrank-AI-notebooks. Nothing left to fill in.
+     ============================================================ */
+
+  :root{
+    --paper: #EEF0E9;
+    --paper-panel: #E2E5DA;
+    --paper-panel-2: #D9DCCE;
+    --ink: #182726;
+    --ink-muted: #52625D;
+    --ink-faint: #8A968E;
+    --line: #C6CBB7;
+    --line-strong: #A9AF98;
+    --under: #AE402B;
+    --under-soft: #E8D3C9;
+    --over: #2C6A54;
+    --over-soft: #D3DECB;
+    --accent: #BD8A2E;
+    --accent-soft: #EFE0BC;
+    --serif: "Newsreader", Georgia, serif;
+    --sans: "IBM Plex Sans", -apple-system, BlinkMacSystemFont, sans-serif;
+    --mono: "IBM Plex Mono", ui-monospace, monospace;
+  }
+
+  *{ box-sizing: border-box; }
+  html{ scroll-behavior: smooth; }
+
+  body{
+    margin: 0;
+    background: var(--paper);
+    color: var(--ink);
+    font-family: var(--sans);
+    font-size: 16px;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  ::selection{ background: var(--accent-soft); }
+
+  a{ color: var(--ink); text-decoration-color: var(--line-strong); text-underline-offset: 3px; }
+  a:hover{ text-decoration-color: var(--ink); }
+
+  .fill-in{
+    border-bottom: 1.5px dashed var(--accent);
+    background: linear-gradient(transparent 60%, var(--accent-soft) 60%);
+    padding: 0 1px;
+    cursor: help;
+  }
+
+  .wrap{
+    max-width: 920px;
+    margin: 0 auto;
+    padding: 0 28px;
+  }
+  .prose{
+    max-width: 700px;
+  }
+
+  /* ---------- masthead ---------- */
+  .masthead{
+    padding: 20px 0 0;
+  }
+  .masthead-inner{
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    border-bottom: 1px solid var(--line);
+    padding-bottom: 14px;
+    font-family: var(--mono);
+    font-size: 12.5px;
+    color: var(--ink-muted);
+    letter-spacing: 0.02em;
+  }
+  .masthead-title{ color: var(--ink); }
+
+  /* ---------- hero ---------- */
+  .hero{
+    padding: 64px 0 40px;
+    display: grid;
+    grid-template-columns: 1.15fr 0.85fr;
+    gap: 48px;
+    align-items: end;
+  }
+  .hero h1{
+    font-family: var(--serif);
+    font-weight: 500;
+    font-size: 52px;
+    line-height: 1.06;
+    letter-spacing: -0.01em;
+    margin: 0 0 18px;
+  }
+  .hero-dek{
+    font-family: var(--serif);
+    font-style: italic;
+    font-size: 20px;
+    color: var(--ink-muted);
+    margin: 0 0 26px;
+    max-width: 46ch;
+  }
+  .hero-meta{
+    font-family: var(--mono);
+    font-size: 12.5px;
+    color: var(--ink-muted);
+    display: flex;
+    gap: 20px;
+    flex-wrap: wrap;
+  }
+  .hero-meta span{ white-space: nowrap; }
+
+  .hero-chart-card{
+    background: var(--paper-panel);
+    border: 1px solid var(--line);
+    padding: 20px 20px 16px;
+  }
+  .hero-chart-label{
+    font-size: 12.5px;
+    color: var(--ink-muted);
+    margin: 0 0 4px;
+  }
+  .hero-chart-title{
+    font-family: var(--serif);
+    font-size: 17px;
+    margin: 0 0 14px;
+  }
+
+  /* ---------- section scaffolding ---------- */
+  section{
+    padding: 56px 0;
+    border-top: 1px solid var(--line);
+  }
+  .section-head{
+    display: grid;
+    grid-template-columns: 200px 1fr;
+    gap: 24px;
+    margin-bottom: 30px;
+  }
+  .section-kicker{
+    font-family: var(--mono);
+    font-size: 12.5px;
+    color: var(--ink-faint);
+    padding-top: 6px;
+  }
+  .section-head h2{
+    font-family: var(--serif);
+    font-weight: 500;
+    font-size: 30px;
+    margin: 0;
+    letter-spacing: -0.005em;
+  }
+  @media (max-width: 680px){
+    .section-head{ grid-template-columns: 1fr; gap: 6px; }
+    .hero{ grid-template-columns: 1fr; }
+    .hero h1{ font-size: 38px; }
+  }
+
+  p{ margin: 0 0 16px; }
+  .prose p:last-child{ margin-bottom: 0; }
+
+  ul.plain{ margin: 0 0 16px; padding-left: 20px; }
+  ul.plain li{ margin-bottom: 8px; }
+
+  .lede{
+    font-family: var(--serif);
+    font-size: 21px;
+    line-height: 1.5;
+    color: var(--ink);
+  }
+
+  /* ---------- abstract ---------- */
+  .abstract-box{
+    background: var(--paper-panel);
+    border-left: 3px solid var(--accent);
+    padding: 24px 28px;
+    font-family: var(--serif);
+    font-size: 18px;
+    line-height: 1.65;
+  }
+
+  /* ---------- two column ---------- */
+  .two-col{
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 40px;
+  }
+  @media (max-width: 680px){ .two-col{ grid-template-columns: 1fr; } }
+
+  /* ---------- data table ---------- */
+  table.data-table{
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 14.5px;
+    margin: 4px 0 24px;
+  }
+  table.data-table caption{
+    text-align: left;
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--ink-faint);
+    margin-bottom: 8px;
+  }
+  table.data-table th, table.data-table td{
+    text-align: left;
+    padding: 8px 12px 8px 0;
+    border-bottom: 1px solid var(--line);
+  }
+  table.data-table th{
+    font-weight: 500;
+    color: var(--ink-muted);
+    font-size: 13px;
+  }
+  table.data-table td.num, table.data-table th.num{ font-family: var(--mono); text-align: right; padding-right: 4px; }
+
+  .excl-list{ list-style: none; margin: 0; padding: 0; }
+  .excl-list li{
+    padding: 10px 0;
+    border-bottom: 1px solid var(--line);
+    display: grid;
+    grid-template-columns: 20px 1fr;
+    gap: 10px;
+    font-size: 14.5px;
+  }
+  .excl-list li:last-child{ border-bottom: none; }
+  .excl-list .mark{ color: var(--under); font-family: var(--mono); }
+
+  /* ---------- methodology steps ---------- */
+  .steps{
+    counter-reset: step;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    border-top: 1px solid var(--line);
+  }
+  .steps li{
+    counter-increment: step;
+    padding: 18px 0 18px 44px;
+    border-bottom: 1px solid var(--line);
+    position: relative;
+    font-size: 15px;
+  }
+  .steps li::before{
+    content: counter(step);
+    position: absolute;
+    left: 0;
+    top: 18px;
+    font-family: var(--mono);
+    font-size: 13px;
+    color: var(--ink-faint);
+  }
+  .steps li strong{ display: block; font-family: var(--sans); font-weight: 600; margin-bottom: 4px; }
+
+  /* ---------- results ---------- */
+  .stat-row{
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1px;
+    background: var(--line);
+    border: 1px solid var(--line);
+    margin-bottom: 32px;
+  }
+  @media (max-width: 680px){ .stat-row{ grid-template-columns: 1fr; } }
+  .stat{
+    background: var(--paper);
+    padding: 22px 20px;
+  }
+  .stat .num{
+    font-family: var(--mono);
+    font-size: 30px;
+    color: var(--ink);
+    line-height: 1;
+    margin-bottom: 8px;
+    display: block;
+  }
+  .stat .label{
+    font-size: 13px;
+    color: var(--ink-muted);
+  }
+
+  .chart-card{
+    background: var(--paper-panel);
+    border: 1px solid var(--line);
+    padding: 24px 24px 20px;
+    margin-bottom: 28px;
+  }
+  .chart-card h3{
+    font-family: var(--serif);
+    font-weight: 500;
+    font-size: 18px;
+    margin: 0 0 2px;
+  }
+  .chart-card .chart-sub{
+    font-size: 13.5px;
+    color: var(--ink-muted);
+    margin-bottom: 16px;
+  }
+  .legend{
+    display: flex;
+    gap: 18px;
+    font-size: 12.5px;
+    color: var(--ink-muted);
+    margin-top: 10px;
+    flex-wrap: wrap;
+  }
+  .legend span{ display: inline-flex; align-items: center; gap: 6px; }
+  .swatch{ width: 10px; height: 10px; display: inline-block; }
+
+  /* ---------- limitations ---------- */
+  .limit-list{ list-style: none; margin: 0; padding: 0; }
+  .limit-list li{
+    padding: 16px 0;
+    border-bottom: 1px solid var(--line);
+    display: grid;
+    grid-template-columns: 110px 1fr;
+    gap: 16px;
+    font-size: 15px;
+  }
+  .limit-list li:first-child{ border-top: 1px solid var(--line); }
+  .limit-tag{
+    font-family: var(--mono);
+    font-size: 11.5px;
+    padding: 3px 8px;
+    align-self: start;
+    text-align: center;
+    border: 1px solid currentColor;
+  }
+  .tag-observed{ color: var(--over); }
+  .tag-directional{ color: var(--accent); }
+  .tag-mixed{ color: var(--under); }
+  @media (max-width: 680px){ .limit-list li{ grid-template-columns: 1fr; } }
+
+  /* ---------- recommendations ---------- */
+  .playbook{
+    border: 1px solid var(--line);
+  }
+  .playbook-row{
+    display: grid;
+    grid-template-columns: 140px 1fr 200px;
+    gap: 20px;
+    padding: 18px 20px;
+    border-bottom: 1px solid var(--line);
+    align-items: start;
+  }
+  .playbook-row:last-child{ border-bottom: none; }
+  .playbook-row:nth-child(odd){ background: var(--paper-panel); }
+  .action-tag{
+    font-family: var(--mono);
+    font-size: 12px;
+    padding: 4px 8px;
+    display: inline-block;
+    white-space: nowrap;
+  }
+  .action-optimize{ background: var(--under-soft); color: var(--under); }
+  .action-monitor{ background: var(--paper-panel-2); color: var(--ink-muted); }
+  .action-protect{ background: var(--over-soft); color: var(--over); }
+  .playbook-desc{ font-size: 14.5px; color: var(--ink); }
+  .playbook-wrong{ font-size: 13px; color: var(--ink-muted); font-style: italic; }
+  @media (max-width: 680px){ .playbook-row{ grid-template-columns: 1fr; } }
+
+  /* ---------- reproducibility ---------- */
+  .repro-list{ list-style: none; margin: 0; padding: 0; }
+  .repro-list li{
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 16px;
+    padding: 12px 0;
+    border-bottom: 1px solid var(--line);
+    font-size: 15px;
+  }
+  .repro-list code{
+    font-family: var(--mono);
+    font-size: 13px;
+    color: var(--ink-muted);
+  }
+
+  /* ---------- footer / acknowledgments ---------- */
+  footer{
+    padding: 48px 0 64px;
+    border-top: 1px solid var(--line);
+  }
+  .credit-line{
+    font-family: var(--serif);
+    font-size: 17px;
+    margin-bottom: 20px;
+  }
+  .footer-meta{
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--ink-faint);
+    display: flex;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .back-to-top{
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--ink-muted);
+  }
+</style>
+</head>
+<body>
+
+<div class="masthead">
+  <div class="wrap masthead-inner">
+    <span class="masthead-title">Search Intelligence — Capstone Study</span>
+    <span>FlyRank ML Internship, 2026</span>
+  </div>
+</div>
+
+<header class="hero wrap" id="top">
+  <div>
+    <h1>The position curve<br>breaks at the top.</h1>
+    <p class="hero-dek">Predicting which pages under-capture clicks relative to where they rank — and finding that the obvious success metric was hiding a label-imbalance problem worth fixing first.</p>
+    <div class="hero-meta">
+      <span>CTR / Engagement Opportunity Scoring</span>
+      <span>Trailing 90-day window</span>
+      <span>Window ending Jun 30, 2026</span>
+      <span>132,128 pages · 115,726 train / 16,402 test</span>
+    </div>
+  </div>
+
+  <div class="hero-chart-card">
+    <p class="hero-chart-label">Discovery, week 1 → confirmed at scale</p>
+    <h3 class="hero-chart-title">Mean CTR by ranking position</h3>
+    <svg id="heroChart" width="100%" height="200" viewBox="0 0 380 200"></svg>
+    <div class="legend">
+      <span><span class="swatch" style="background:var(--ink-muted)"></span>mean CTR (impressions ≥ 100)</span>
+    </div>
+  </div>
+</header>
+
+<main>
+
+<!-- ABSTRACT -->
+<section id="abstract">
+  <div class="wrap">
+    <div class="section-head">
+      <div class="section-kicker">Title &amp; abstract</div>
+      <h2>What this paper asks, and what it finds</h2>
+    </div>
+    <div class="abstract-box prose">
+      <p>
+        Which pages are under-capturing clicks relative to what their search ranking position should earn, and can that gap be predicted before someone has to notice it by hand?
+        We build a content-level feature table of 132,128 pages from the FlyRank search-intelligence warehouse (trailing 90 days ending June 30, 2026), define underperformance as CTR falling below a position-bucket benchmark fit on a client-held-out training split, and score a random forest against the team's existing hand-written rule on an identical, leakage-checked test split of 16,402 pages.
+        On Precision@50 the rule reaches a perfect 1.00 and the model lands close behind at 0.98 — but that comparison turns out to be less meaningful than it looks, since 82.9% of test-set pages already carry the "underperforms" label, so almost any reasonable top-50 list clears it; the model's ROC-AUC of 0.81 and F1 of 0.91 are the more honest read of what it's actually separating.
+        Along the way, the position curve itself turns out not to be monotonic: pages ranking 1–3 average a lower CTR (0.0025) than pages ranking 4–10 (0.0030), a pattern consistent with SERP-feature click absorption rather than a data error.
+        We report this as decision-support ranking, not a claim that the model beats the rule outright, and flag the label's imbalance as the next thing to fix before trusting Precision@50 on this task.
+      </p>
+    </div>
+  </div>
+</section>
+
+<!-- INTRO -->
+<section id="intro">
+  <div class="wrap">
+    <div class="section-head">
+      <div class="section-kicker">01 · Introduction</div>
+      <h2>The decision this supports</h2>
+    </div>
+    <div class="prose">
+      <p class="lede">A content team can review a handful of pages a week. The warehouse holds thousands. Something has to decide which handful.</p>
+      <p>
+        Today that decision leans on a hand-written rule: compare a page's click-through rate to the average CTR of other pages at the same ranking position, and flag the gap. It is transparent and cheap to compute, but it treats every signal about a page — how stale it is, how much traffic it sees, what kind of content it is — as invisible except for one number: position.
+      </p>
+      <p>
+        This study asks whether a model that can combine those signals finds a better review queue than the rule does, evaluated the only way that matters here: on pages neither the rule's benchmark nor the model has seen, ranked the way a content team would actually consume the output — top 50 first.
+      </p>
+    </div>
+  </div>
+</section>
+
+<!-- DATA -->
+<section id="data">
+  <div class="wrap">
+    <div class="section-head">
+      <div class="section-kicker">02 · Data</div>
+      <h2>What went into this</h2>
+    </div>
+
+    <div class="two-col">
+      <div>
+        <table class="data-table">
+          <caption>Source: FlyRank/internship-warehouse (Hugging Face, gated)</caption>
+          <thead>
+            <tr><th>Table</th><th>Role</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>dim_content</td><td>content attributes — type, word count, update dates, publish status</td></tr>
+            <tr><td>dim_clients</td><td>client grouping key, used only for the train/test split</td></tr>
+            <tr><td>fact_content_query_90d</td><td>trailing 90-day impressions, clicks, position, anonymization flags</td></tr>
+          </tbody>
+        </table>
+        <p style="font-size:14.5px; color:var(--ink-muted)">
+          Window: trailing 90 days ending 2026-06-30.
+          Unit of analysis: one row per <code style="font-family:var(--mono); font-size:13px">content_hash_id</code>, aggregated across its queries.
+          132,128 published, non-deleted pages after exclusions — split 115,726 / 16,402 by client.
+        </p>
+      </div>
+
+      <div>
+        <p style="font-size:13px; font-family:var(--mono); color:var(--ink-faint); margin-bottom:10px;">Excluded, and why</p>
+        <ul class="excl-list">
+          <li><span class="mark">–</span><span>Unpublished or deleted content — not a live page a team could act on.</span></li>
+          <li><span class="mark">–</span><span>Rows with zero impressions in the window — no click behavior to evaluate.</span></li>
+          <li><span class="mark">–</span><span>Client names, domains, URLs, raw query text — every join key here is a one-way hash; nothing public-facing leaves this table.</span></li>
+          <li><span class="mark">–</span><span>Any metric not knowable at prediction time, and outcomes used to fit the CTR benchmark itself.</span></li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- METHODOLOGY -->
+<section id="methodology">
+  <div class="wrap">
+    <div class="section-head">
+      <div class="section-kicker">03 · Methodology</div>
+      <h2>Assumptions, features, and how the split works</h2>
+    </div>
+
+    <p class="prose" style="max-width:700px; margin-bottom:28px;">
+      <strong>Label.</strong> <code style="font-family:var(--mono); font-size:13.5px">underperforms_ctr</code> = 1 if a page's actual CTR sits below the average CTR of its position bucket (1–3, 4–10, 11–20, 21–50, 51+) — where that average is computed <em>only from the training split</em>, so the benchmark never sees a page it will later be used to judge.
+      <strong>Baseline.</strong> the existing rule: score = max(0, expected CTR − actual CTR) × impressions, ranked and read as Precision@50.
+      <strong>Features</strong> given to the model: position, impressions, word count, days since last update, content type, and the two anonymization-noise fields the warehouse ships to flag thin-sample rows.
+    </p>
+
+    <ol class="steps">
+      <li><strong>Grouped split by client, not by row</strong>Content is split 75/25 by <code style="font-family:var(--mono); font-size:13px">client_hash_id</code>, so no client appears in both train and test — otherwise a model could learn a client instead of learning the underlying pattern.</li>
+      <li><strong>Benchmark fit on train only</strong>The position-bucket CTR average that defines the label, and that the baseline rule scores against, is computed strictly from training rows, then applied unchanged to test rows.</li>
+      <li><strong>Same split, same metric, both methods</strong>The rule and the random forest are scored on the identical held-out test set, with the identical ranking metric (Precision@50), so the comparison isn't an accident of different evaluation setups.</li>
+      <li><strong>Leakage self-audit</strong>Before trusting the result: assert zero client overlap between splits, assert none of the model's input features are derived from the label or from clicks/CTR directly, and print the sample size behind every bucket average used.</li>
+    </ol>
+  </div>
+</section>
+
+<!-- RESULTS -->
+<section id="results">
+  <div class="wrap">
+    <div class="section-head">
+      <div class="section-kicker">04 · Results</div>
+      <h2>Model vs. baseline, same split</h2>
+    </div>
+
+    <div class="stat-row">
+      <div class="stat">
+        <span class="num">1.00</span>
+        <span class="label">Baseline rule — Precision@50</span>
+      </div>
+      <div class="stat">
+        <span class="num">0.98</span>
+        <span class="label">Random forest — Precision@50</span>
+      </div>
+      <div class="stat">
+        <span class="num">0.81</span>
+        <span class="label">Model ROC-AUC, held-out test (F1 = 0.91)</span>
+      </div>
+    </div>
+
+    <div class="chart-card">
+      <h3>Precision@50 — of the top 50 flagged pages, how many truly underperform</h3>
+      <p class="chart-sub">Same held-out test split for both methods — read with caution, label base rate is 82.9%.</p>
+      <svg id="precisionChart" width="100%" height="140" viewBox="0 0 640 140"></svg>
+    </div>
+
+    <div class="chart-card">
+      <h3>What the model actually weighs</h3>
+      <p class="chart-sub">Feature importances, random forest (held-out test split, window ending 2026-06-30).</p>
+      <svg id="importanceChart" width="100%" height="220" viewBox="0 0 640 220"></svg>
+    </div>
+
+    <p class="prose" style="max-width:700px;">
+      Read alongside the label balance, the top-line comparison is less flattering to either method than it first looks. 82.9% of test-set pages are already labeled "underperforming," so a top-50 list drawn almost at random would land close to that base rate before either method does anything clever — the rule's perfect 1.00 and the model's 0.98 are both, in part, a property of the label, not proof of ranking skill. F1 (0.91) and ROC-AUC (0.81) separate the two more usefully: the model is combining impressions, position, and two anonymization-noise fields (below) rather than reading off a single bucket average, which is where it earns whatever edge it has.
+    </p>
+
+    <p class="prose" style="max-width:700px;">
+      The position curve itself is part of the finding. Fit on the training split across the full warehouse, mean CTR by bucket runs 0.0030 (4–10) → 0.0019 (11–20) → 0.0009 (21–50) → 0.0002 (51+) — falling the way intuition expects. But bucket 1–3 breaks that pattern, landing at 0.0025: <em>below</em> 4–10, not above it. Row-level inspection in the Week-4 baseline rules out a join or aggregation artifact — many high-impression rows at good positions show zero clicks, consistent with AI Overviews and other SERP features absorbing the click before a visit happens. That anomaly is why a flat position-based rule struggles at the top of the ranking, and it's the strongest evidence for why the 1–3 bucket needs a different benchmark, not a "just rank higher" recommendation.
+    </p>
+  </div>
+</section>
+
+<!-- LIMITATIONS -->
+<section id="limitations">
+  <div class="wrap">
+    <div class="section-head">
+      <div class="section-kicker">05 · Limitations</div>
+      <h2>Honest framing</h2>
+    </div>
+    <ul class="limit-list">
+      <li>
+        <span class="limit-tag tag-mixed">mixed</span>
+        <span>The label is imbalanced — 82.9% of test-set pages are "underperforming" under this definition — which inflates Precision@50 for almost any reasonable ranking. The rule's 1.00 and the model's 0.98 owe more to that base rate than to either method cleanly separating good pages from bad ones; F1 (0.91) and ROC-AUC (0.81) are the more trustworthy comparison until the label is rebalanced or reframed.</span>
+      </li>
+      <li>
+        <span class="limit-tag tag-mixed">mixed</span>
+        <span>The CTR-vs-position relationship is confirmed for buckets 4–10 through 51+, but breaks at 1–3. Treat the top-position benchmark as unreliable until it's refit with a method that accounts for SERP-feature absorption.</span>
+      </li>
+      <li>
+        <span class="limit-tag tag-directional">directional</span>
+        <span><code style="font-family:var(--mono); font-size:13px">underperforms_ctr</code> is a proxy label — a statistical benchmark, not a verified ground truth that a page has a fixable problem. A flagged page is a candidate for review, not a confirmed defect.</span>
+      </li>
+      <li>
+        <span class="limit-tag tag-observed">observed</span>
+        <span>Everything here is one 90-day trailing window on anonymized, hashed data. Nothing in this paper claims to reveal or prove how Google's ranking algorithm works.</span>
+      </li>
+      <li>
+        <span class="limit-tag tag-mixed">mixed</span>
+        <span>Precision@50 is compared on a single 75/25 grouped split. That's one draw from the client population — a repeated grouped cross-validation would tighten confidence in the gap between model and baseline before it's used to justify process change.</span>
+      </li>
+      <li>
+        <span class="limit-tag tag-directional">directional</span>
+        <span>High-impression, near-zero-click pages at good positions are flagged the same as any other underperformer, even when the likely cause (SERP-feature cannibalization) isn't fixable by editing the page. Reason codes and the "wrong if" notes below exist specifically to catch this before a human wastes a rewrite on it.</span>
+      </li>
+    </ul>
+  </div>
+</section>
+
+<!-- RECOMMENDATIONS -->
+<section id="recommendations">
+  <div class="wrap">
+    <div class="section-head">
+      <div class="section-kicker">06 · Recommendations</div>
+      <h2>The action playbook</h2>
+    </div>
+    <div class="playbook">
+      <div class="playbook-row">
+        <span class="action-tag action-optimize">optimize_ctr</span>
+        <span class="playbook-desc">Pages the model scores highest for underperformance, with a normal update history and moderate impressions. Rewrite title/meta, review snippet-worthiness, re-test.</span>
+        <span class="playbook-wrong">wrong if: updated in the last 7 days — CTR hasn't had time to respond yet</span>
+      </div>
+      <div class="playbook-row">
+        <span class="action-tag action-protect">monitor_serp_feature</span>
+        <span class="playbook-desc">High-impression pages (&gt;300k/90d) with near-zero CTR at good position. Watch for AI Overview / featured-snippet presence before assuming a fixable CTR problem.</span>
+        <span class="playbook-wrong">wrong if: the click was never available to capture in the first place</span>
+      </div>
+      <div class="playbook-row">
+        <span class="action-tag action-monitor">monitor</span>
+        <span class="playbook-desc">Pages the model scores as meeting or exceeding their position-bucket expectation. No action — re-score next window.</span>
+        <span class="playbook-wrong">wrong if: recent volatility means one window isn't representative yet</span>
+      </div>
+      <div class="playbook-row">
+        <span class="action-tag action-monitor">low-confidence bucket</span>
+        <span class="playbook-desc">Any page whose position bucket has a small training sample behind its benchmark (see methodology, step 4). Treat its score as noisier than the rest of the queue.</span>
+        <span class="playbook-wrong">wrong if: treated with the same confidence as a well-sampled bucket</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- REPRODUCIBILITY -->
+<section id="reproducibility">
+  <div class="wrap">
+    <div class="section-head">
+      <div class="section-kicker">07 · Reproducibility</div>
+      <h2>Run it yourself</h2>
+    </div>
+    <p class="prose" style="max-width:700px; margin-bottom:20px;">
+      Every number above comes from code in this repository. No client data, credentials, or raw exports are included — only a Hugging Face read token you provide yourself.
+    </p>
+    <ul class="repro-list">
+      <li><span>Capstone model notebook — feature build, grouped split, baseline vs. model, leakage checks</span><code><a href="https://github.com/Arma3071/Flyrank-AI-notebooks/blob/main/capstone_ctr_opportunity_model.ipynb" target="_blank" rel="noopener">capstone_ctr_opportunity_model.ipynb</a></code></li>
+      <li><span>Week 4 — hand-written baseline rule</span><code><a href="https://github.com/Arma3071/Flyrank-AI-notebooks/blob/main/w04_baseline_score.ipynb" target="_blank" rel="noopener">w04_baseline_score.ipynb</a></code></li>
+      <li><span>Week 3 — data contract &amp; leakage walkthrough</span><code><a href="https://github.com/Arma3071/Flyrank-AI-notebooks/blob/main/w03_data_contract.ipynb" target="_blank" rel="noopener">w03_data_contract.ipynb</a></code></li>
+      <li><span>Week 2 — ML task framing</span><code><a href="https://github.com/Arma3071/Flyrank-AI-notebooks/blob/main/w02_ml_task_framing.ipynb" target="_blank" rel="noopener">w02_ml_task_framing.ipynb</a></code></li>
+      <li><span>Full repository</span><code><a href="https://github.com/Arma3071/Flyrank-AI-notebooks" target="_blank" rel="noopener">github.com/Arma3071/Flyrank-AI-notebooks</a></code></li>
+    </ul>
+  </div>
+</section>
+
+</main>
+
+<footer>
+  <div class="wrap">
+    <p class="credit-line">Built on the <a href="https://flyrank.ai" target="_blank" rel="noopener">FlyRank ML Internship dataset</a>.</p>
+    <div class="footer-meta">
+      <span>Search Intelligence Capstone — CTR / Engagement Opportunity Scoring</span>
+      <a class="back-to-top" href="#top">back to top</a>
+    </div>
+  </div>
+</footer>
+
+<script>
+/* ============================================================
+   DATA — edit this object with your notebook's real output,
+   then reload the page. Charts below read only from here.
+   ============================================================ */
+const DATA = {
+  // Real numbers from the executed capstone notebook (full warehouse,
+  // train-split position-bucket benchmark, window ending 2026-06-30).
+  ctrByPosition: [
+    { bucket: "1–3",   ctr: 0.0025 },
+    { bucket: "4–10",  ctr: 0.0030 },
+    { bucket: "11–20", ctr: 0.0019 },
+    { bucket: "21–50", ctr: 0.0009 },
+    { bucket: "51+",   ctr: 0.0002 },
+  ],
+
+  // baseline_p50 = precision_at_k(test_df, "baseline_score", "underperforms_ctr", k=50)
+  // model_p50    = precision_at_k(test_df, "model_proba", "underperforms_ctr", k=50)
+  precision: {
+    baseline: 1.00,
+    model: 0.98,
+  },
+
+  // pd.Series(model.feature_importances_, index=X_train_raw.columns).sort_values(ascending=False).head(10)
+  importances: [
+    { feature: "impressions_90d",               value: 0.319 },
+    { feature: "avg_position_90d",               value: 0.172 },
+    { feature: "rare_query_count",                value: 0.148 },
+    { feature: "anonymized_impressions_share",    value: 0.142 },
+    { feature: "rare_impressions_share",          value: 0.127 },
+    { feature: "word_count",                      value: 0.069 },
+    { feature: "days_since_update",               value: 0.022 },
+  ],
+};
+
+function svgEl(tag, attrs){
+  const el = document.createElementNS("http://www.w3.org/2000/svg", tag);
+  for(const k in attrs) el.setAttribute(k, attrs[k]);
+  return el;
+}
+
+// --- Hero: CTR by position (line + points) ---
+(function drawHeroChart(){
+  const svg = document.getElementById("heroChart");
+  const W = 380, H = 200, padL = 34, padR = 14, padT = 10, padB = 28;
+  const data = DATA.ctrByPosition;
+  const maxCtr = Math.max(...data.map(d => d.ctr)) * 1.15;
+  const x = i => padL + (i / (data.length - 1)) * (W - padL - padR);
+  const y = v => H - padB - (v / maxCtr) * (H - padT - padB);
+
+  // gridline
+  svg.appendChild(svgEl("line", { x1: padL, y1: H - padB, x2: W - padR, y2: H - padB, stroke: "var(--line-strong)", "stroke-width": 1 }));
+
+  // path
+  const pts = data.map((d,i) => `${x(i)},${y(d.ctr)}`).join(" ");
+  svg.appendChild(svgEl("polyline", { points: pts, fill: "none", stroke: "var(--ink-muted)", "stroke-width": 2 }));
+
+  data.forEach((d,i) => {
+    const isAnomaly = i === 0;
+    svg.appendChild(svgEl("circle", { cx: x(i), cy: y(d.ctr), r: isAnomaly ? 4.5 : 3.5, fill: isAnomaly ? "var(--under)" : "var(--ink)" }));
+    const t = svgEl("text", { x: x(i), y: H - 10, "text-anchor": "middle", "font-size": "10.5", "font-family": "var(--mono)", fill: "var(--ink-muted)" });
+    t.textContent = d.bucket;
+    svg.appendChild(t);
+    const vLabel = svgEl("text", { x: x(i), y: y(d.ctr) - 10, "text-anchor": "middle", "font-size": "10", "font-family": "var(--mono)", fill: isAnomaly ? "var(--under)" : "var(--ink-muted)" });
+    vLabel.textContent = d.ctr.toFixed(4);
+    svg.appendChild(vLabel);
+  });
+
+  const axisLabel = svgEl("text", { x: 4, y: 12, "font-size": "9.5", "font-family": "var(--mono)", fill: "var(--ink-faint)" });
+  axisLabel.textContent = "CTR";
+  svg.appendChild(axisLabel);
+})();
+
+// --- Precision@50 bar comparison ---
+(function drawPrecisionChart(){
+  const svg = document.getElementById("precisionChart");
+  const W = 640, H = 140, padL = 60, padR = 40, padT = 20, padB = 30;
+  const rows = [
+    { label: "Baseline rule", value: DATA.precision.baseline, color: "var(--ink-faint)" },
+    { label: "Random forest", value: DATA.precision.model, color: "var(--under)" },
+  ];
+  const hasData = rows.every(r => typeof r.value === "number");
+  const maxV = hasData ? Math.max(...rows.map(r=>r.value)) * 1.2 : 1;
+  const barH = 30, gap = 26;
+  const y0 = padT;
+
+  rows.forEach((r,i) => {
+    const y = y0 + i * (barH + gap);
+    const label = svgEl("text", { x: 0, y: y + barH/2 + 4, "font-size": "12.5", "font-family": "var(--sans)", fill: "var(--ink)" });
+    label.textContent = r.label;
+    svg.appendChild(label);
+
+    const trackW = W - padL - padR;
+    svg.appendChild(svgEl("rect", { x: padL, y, width: trackW, height: barH, fill: "var(--paper-panel-2)" }));
+
+    if(hasData){
+      const w = (r.value / maxV) * trackW;
+      svg.appendChild(svgEl("rect", { x: padL, y, width: w, height: barH, fill: r.color }));
+      const val = svgEl("text", { x: padL + w + 8, y: y + barH/2 + 4, "font-size": "13", "font-family": "var(--mono)", fill: "var(--ink)" });
+      val.textContent = r.value.toFixed(2);
+      svg.appendChild(val);
+    } else {
+      const val = svgEl("text", { x: padL + 8, y: y + barH/2 + 4, "font-size": "12.5", "font-family": "var(--mono)", fill: "var(--ink-faint)" });
+      val.textContent = "fill in DATA.precision in the script below";
+      svg.appendChild(val);
+    }
+  });
+})();
+
+// --- Feature importances ---
+(function drawImportanceChart(){
+  const svg = document.getElementById("importanceChart");
+  const W = 640, H = 220, padL = 150, padR = 50, padT = 10, padB = 10;
+  const rows = DATA.importances;
+
+  if(!rows || rows.length === 0){
+    const t = svgEl("text", { x: padL, y: 40, "font-size": "12.5", "font-family": "var(--mono)", fill: "var(--ink-faint)" });
+    t.textContent = "fill in DATA.importances in the script below";
+    svg.appendChild(t);
+    return;
+  }
+
+  const maxV = Math.max(...rows.map(r => r.value)) * 1.15;
+  const rowH = (H - padT - padB) / rows.length;
+  const barH = Math.min(20, rowH * 0.55);
+
+  rows.forEach((r,i) => {
+    const y = padT + i * rowH + (rowH - barH) / 2;
+    const label = svgEl("text", { x: padL - 10, y: y + barH/2 + 4, "text-anchor": "end", "font-size": "12", "font-family": "var(--mono)", fill: "var(--ink-muted)" });
+    label.textContent = r.feature;
+    svg.appendChild(label);
+
+    const trackW = W - padL - padR;
+    const w = (r.value / maxV) * trackW;
+    svg.appendChild(svgEl("rect", { x: padL, y, width: w, height: barH, fill: "var(--accent)" }));
+    const val = svgEl("text", { x: padL + w + 8, y: y + barH/2 + 4, "font-size": "12", "font-family": "var(--mono)", fill: "var(--ink)" });
+    val.textContent = r.value.toFixed(3);
+    svg.appendChild(val);
+  });
+})();
+</script>
+
+</body>
+</html>
